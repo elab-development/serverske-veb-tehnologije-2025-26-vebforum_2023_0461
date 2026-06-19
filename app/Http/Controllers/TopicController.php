@@ -14,7 +14,7 @@ class TopicController extends Controller
      */
     public function index()
     {
-        //
+        return response()->json(Topic::all());
     }
 
     /**
@@ -24,7 +24,9 @@ class TopicController extends Controller
      */
     public function create()
     {
-        //
+        return response()->json([
+            'message' => 'Create topic form'
+        ]);
     }
 
     /**
@@ -35,7 +37,8 @@ class TopicController extends Controller
      */
     public function store(Request $request)
     {
-        //
+        $topic = Topic::create($request->all());
+        return response()->json($topic);
     }
 
     /**
@@ -46,7 +49,7 @@ class TopicController extends Controller
      */
     public function show(Topic $topic)
     {
-        //
+        return response()->json($topic);
     }
 
     /**
@@ -57,7 +60,9 @@ class TopicController extends Controller
      */
     public function edit(Topic $topic)
     {
-        //
+        return response()->json([
+            'message' => 'Edit topic form'
+        ]);
     }
 
     /**
@@ -69,7 +74,8 @@ class TopicController extends Controller
      */
     public function update(Request $request, Topic $topic)
     {
-        //
+        $topic->update($request->all());
+        return response()->json($topic);
     }
 
     /**
@@ -80,6 +86,9 @@ class TopicController extends Controller
      */
     public function destroy(Topic $topic)
     {
-        //
+        $topic->delete();
+        return response()->json([
+            'message' => 'Topic deleted'
+        ]);
     }
 }
