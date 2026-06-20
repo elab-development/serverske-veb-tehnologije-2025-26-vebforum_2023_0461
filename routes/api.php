@@ -1,17 +1,32 @@
 <?php
 
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\TopicController;
 use App\Http\Controllers\PostController;
 use App\Http\Controllers\AuthController;
-Route::apiResource('categories', CategoryController::class);
-Route::apiResource('topics', TopicController::class);
-Route::apiResource('posts', PostController::class);
-Route::post('register', [AuthController::class, 'register']);   
-route::post('login', [AuthController::class, 'login']);
-Route::middleware('auth:sanctum')->post('logout', [AuthController::class, 'logout']);
+
+Route::post('register', [AuthController::class, 'register']);
+Route::post('login', [AuthController::class, 'login']);
+
+Route::apiResource('categories', CategoryController::class)->only(['index', 'show']);
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('logout', [AuthController::class, 'logout']);
+
+    Route::get('categories/{category}/topics', [CategoryController::class, 'topics']);
+    Route::get('topics/{topic}/posts', [TopicController::class, 'posts']);
+    Route::get('search/topics', [TopicController::class, 'search']);
+
+    Route::apiResource('categories', CategoryController::class)->only(['store', 'update', 'destroy']);
+    Route::apiResource('topics', TopicController::class);
+    Route::apiResource('posts', PostController::class);
+
+    Route::get('/user', function (\Illuminate\Http\Request $request) {
+        return response()->json($request->user());
+    });
+});
+
 /*
 |--------------------------------------------------------------------------
 | API Routes
@@ -22,7 +37,3 @@ Route::middleware('auth:sanctum')->post('logout', [AuthController::class, 'logou
 | is assigned the "api" middleware group. Enjoy building your API!
 |
 */
-
-Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
-    return $request->user();
-});

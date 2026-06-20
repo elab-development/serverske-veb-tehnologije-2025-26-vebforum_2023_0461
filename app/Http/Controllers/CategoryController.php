@@ -51,6 +51,11 @@ class CategoryController extends Controller
         return response()->json($category);
     }
 
+    public function topics(Category $category)
+    {
+        return response()->json($category->topics);
+    }
+
     /**
      * Show the form for editing the specified resource.
      *

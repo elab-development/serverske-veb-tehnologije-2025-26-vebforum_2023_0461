@@ -52,6 +52,24 @@ class TopicController extends Controller
         return response()->json($topic);
     }
 
+    public function posts(Topic $topic)
+    {
+        return response()->json($topic->posts);
+    }
+
+    public function search(Request $request)
+    {
+        $data = $request->validate([
+            'query' => 'required|string'
+        ]);
+
+        $topics = Topic::where('title', 'like', '%' . $data['query'] . '%')
+            ->orWhere('body', 'like', '%' . $data['query'] . '%')
+            ->get();
+
+        return response()->json($topics);
+    }
+
     /**
      * Show the form for editing the specified resource.
      *
