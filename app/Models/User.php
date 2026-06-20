@@ -11,14 +11,14 @@ use Laravel\Sanctum\HasApiTokens;
 class User extends Authenticatable
 {
     public function topics()
-{
-    return $this->hasMany(Topic::class);
-}
+    {
+        return $this->hasMany(Topic::class);
+    }
 
-public function posts()
-{
-    return $this->hasMany(Post::class);
-}
+    public function posts()
+    {
+        return $this->hasMany(Post::class);
+    }
     use HasApiTokens, HasFactory, Notifiable;
 
     /**
@@ -30,6 +30,7 @@ public function posts()
         'name',
         'email',
         'password',
+        'role'
     ];
 
     /**
