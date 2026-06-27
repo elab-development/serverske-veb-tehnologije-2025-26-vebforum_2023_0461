@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Resources\PostResource;
 use App\Models\Post;
 use Illuminate\Http\Request;
 
@@ -20,7 +21,7 @@ class PostController extends Controller
             $query->where('body', 'like', '%' . $request->input('body') . '%');
         }
 
-        return response()->json($query->paginate(10));
+        return PostResource::collection($query->paginate(10));
     }
 
     /**
@@ -43,8 +44,15 @@ class PostController extends Controller
      */
     public function store(Request $request)
     {
-        $post = Post::create($request->all());
-        return response()->json($post);
+        $data = $request->validate([
+            'body' => 'required|string',
+            'topic_id' => 'required|exists:topics,id',
+            'user_id' => 'required|exists:users,id',
+        ]);
+
+        $post = Post::create($data);
+
+        return new PostResource($post);
     }
 
     /**
@@ -55,7 +63,7 @@ class PostController extends Controller
      */
     public function show(Post $post)
     {
-        return response()->json($post);
+        return new PostResource($post);
     }
 
     /**
@@ -80,8 +88,15 @@ class PostController extends Controller
      */
     public function update(Request $request, Post $post)
     {
-        $post->update($request->all());
-        return response()->json($post);
+        $data = $request->validate([
+            'body' => 'required|string',
+            'topic_id' => 'required|exists:topics,id',
+            'user_id' => 'required|exists:users,id',
+        ]);
+
+        $post->update($data);
+
+        return new PostResource($post);
     }
 
     /**

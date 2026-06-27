@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Resources\CategoryResource;
 use App\Models\Category;
 use Illuminate\Http\Request;
 
@@ -20,7 +21,7 @@ class CategoryController extends Controller
             $query->where('name', 'like', '%' . $request->input('name') . '%');
         }
 
-        return response()->json($query->paginate(10));
+        return CategoryResource::collection($query->paginate(10));
     }
 
     /**
@@ -41,9 +42,14 @@ class CategoryController extends Controller
      */
     public function store(Request $request)
     {
-         $category = Category::create($request->all());
+        $data = $request->validate([
+            'name' => 'required|string|max:255',
+            'description' => 'nullable|string',
+        ]);
 
-    return response()->json($category);
+        $category = Category::create($data);
+
+        return new CategoryResource($category);
     }
 
     /**
@@ -54,7 +60,7 @@ class CategoryController extends Controller
      */
     public function show(Category $category)
     {
-        return response()->json($category);
+        return new CategoryResource($category);
     }
 
     public function topics(Category $category)
@@ -82,9 +88,14 @@ class CategoryController extends Controller
      */
     public function update(Request $request, Category $category)
     {
-          $category->update($request->all());
+        $data = $request->validate([
+            'name' => 'required|string|max:255',
+            'description' => 'nullable|string',
+        ]);
 
-    return response()->json($category);
+        $category->update($data);
+
+        return new CategoryResource($category);
     }
 
     /**

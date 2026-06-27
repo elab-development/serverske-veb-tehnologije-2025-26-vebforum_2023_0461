@@ -43,7 +43,14 @@ class TopicController extends Controller
      */
    public function store(Request $request)
 {
-    $topic = Topic::create($request->all());
+    $data = $request->validate([
+        'title' => 'required|string|max:200',
+        'body' => 'required|string',
+        'category_id' => 'required|exists:categories,id',
+        'user_id' => 'required|exists:users,id',
+    ]);
+
+    $topic = Topic::create($data);
 
     return new TopicResource($topic);
 }
@@ -99,7 +106,14 @@ class TopicController extends Controller
      */
     public function update(Request $request, Topic $topic)
 {
-    $topic->update($request->all());
+    $data = $request->validate([
+        'title' => 'required|string|max:200',
+        'body' => 'required|string',
+        'category_id' => 'required|exists:categories,id',
+        'user_id' => 'required|exists:users,id',
+    ]);
+
+    $topic->update($data);
 
     return new TopicResource($topic);
 }
