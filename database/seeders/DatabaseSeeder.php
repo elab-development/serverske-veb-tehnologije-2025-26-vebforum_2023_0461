@@ -2,23 +2,42 @@
 
 namespace Database\Seeders;
 
-// use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use App\Models\User;
+use App\Models\Category;
+use App\Models\Topic;
+use App\Models\Post;
 
 class DatabaseSeeder extends Seeder
 {
-    /**
-     * Seed the application's database.
-     *
-     * @return void
-     */
     public function run()
     {
-        // \App\Models\User::factory(10)->create();
+        $admin = User::factory()->create([
+            'name' => 'Admin User',
+            'email' => 'admin@example.com',
+            'role' => 'admin',
+        ]);
 
-        // \App\Models\User::factory()->create([
-        //     'name' => 'Test User',
-        //     'email' => 'test@example.com',
-        // ]);
+        $user = User::factory()->create([
+            'name' => 'Regular User',
+            'email' => 'user@example.com',
+            'role' => 'user',
+        ]);
+
+        $categories = Category::factory(5)->create();
+
+        $categories->each(function ($category) use ($admin, $user) {
+            $topics = Topic::factory(3)->create([
+                'category_id' => $category->id,
+                'user_id' => $admin->id,
+            ]);
+
+            $topics->each(function ($topic) use ($user) {
+                Post::factory(4)->create([
+                    'topic_id' => $topic->id,
+                    'user_id' => $user->id,
+                ]);
+            });
+        });
     }
 }
