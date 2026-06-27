@@ -12,9 +12,15 @@ class PostController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function index()
+    public function index(Request $request)
     {
-        return response()->json(Post::all());
+        $query = Post::query();
+
+        if ($request->filled('body')) {
+            $query->where('body', 'like', '%' . $request->input('body') . '%');
+        }
+
+        return response()->json($query->paginate(10));
     }
 
     /**

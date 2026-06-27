@@ -12,9 +12,15 @@ class TopicController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function index()
+    public function index(Request $request)
     {
-        return response()->json(Topic::all());
+        $query = Topic::query();
+
+        if ($request->filled('title')) {
+            $query->where('title', 'like', '%' . $request->input('title') . '%');
+        }
+
+        return response()->json($query->paginate(10));
     }
 
     /**
