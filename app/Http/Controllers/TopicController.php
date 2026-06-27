@@ -1,7 +1,7 @@
 <?php
 
 namespace App\Http\Controllers;
-
+use App\Http\Resources\TopicResource;
 use App\Models\Topic;
 use Illuminate\Http\Request;
 
@@ -16,11 +16,11 @@ class TopicController extends Controller
     {
         $query = Topic::query();
 
-        if ($request->filled('title')) {
-            $query->where('title', 'like', '%' . $request->input('title') . '%');
-        }
+    if ($request->filled('title')) {
+        $query->where('title', 'like', '%' . $request->input('title') . '%');
+    }
 
-        return response()->json($query->paginate(10));
+    return TopicResource::collection($query->paginate(10));
     }
 
     /**
@@ -41,11 +41,12 @@ class TopicController extends Controller
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Response
      */
-    public function store(Request $request)
-    {
-        $topic = Topic::create($request->all());
-        return response()->json($topic);
-    }
+   public function store(Request $request)
+{
+    $topic = Topic::create($request->all());
+
+    return new TopicResource($topic);
+}
 
     /**
      * Display the specified resource.
@@ -54,9 +55,9 @@ class TopicController extends Controller
      * @return \Illuminate\Http\Response
      */
     public function show(Topic $topic)
-    {
-        return response()->json($topic);
-    }
+{
+    return new TopicResource($topic);
+}
 
     public function posts(Topic $topic)
     {
@@ -64,17 +65,17 @@ class TopicController extends Controller
     }
 
     public function search(Request $request)
-    {
-        $data = $request->validate([
-            'query' => 'required|string'
-        ]);
+{
+    $data = $request->validate([
+        'query' => 'required|string'
+    ]);
 
-        $topics = Topic::where('title', 'like', '%' . $data['query'] . '%')
-            ->orWhere('body', 'like', '%' . $data['query'] . '%')
-            ->get();
+    $topics = Topic::where('title', 'like', '%' . $data['query'] . '%')
+        ->orWhere('body', 'like', '%' . $data['query'] . '%')
+        ->get();
 
-        return response()->json($topics);
-    }
+    return TopicResource::collection($topics);
+}
 
     /**
      * Show the form for editing the specified resource.
@@ -97,10 +98,11 @@ class TopicController extends Controller
      * @return \Illuminate\Http\Response
      */
     public function update(Request $request, Topic $topic)
-    {
-        $topic->update($request->all());
-        return response()->json($topic);
-    }
+{
+    $topic->update($request->all());
+
+    return new TopicResource($topic);
+}
 
     /**
      * Remove the specified resource from storage.
