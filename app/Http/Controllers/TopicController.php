@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Resources\TopicResource;
 use App\Models\Topic;
+use App\Models\Vote;
 use Illuminate\Http\Request;
 
 class TopicController extends Controller
@@ -107,7 +108,7 @@ class TopicController extends Controller
      */
     public function update(Request $request, Topic $topic)
     {
-        if ($request->user()->role !== 'admin' && $topic->user_id !== $request->user()->id) {
+        if (! in_array($request->user()->role, ['admin', 'moderator'], true) && $topic->user_id !== $request->user()->id) {
             return response()->json([
                 'message' => 'Forbidden'
             ], 403);
@@ -132,7 +133,7 @@ class TopicController extends Controller
      */
     public function destroy(Request $request, Topic $topic)
     {
-        if ($request->user()->role !== 'admin' && $topic->user_id !== $request->user()->id) {
+        if (! in_array($request->user()->role, ['admin', 'moderator'], true) && $topic->user_id !== $request->user()->id) {
             return response()->json([
                 'message' => 'Forbidden'
             ], 403);
@@ -141,6 +142,35 @@ class TopicController extends Controller
         $topic->delete();
         return response()->json([
             'message' => 'Topic deleted'
+        ]);
+    }
+
+    public function vote(Request $request, Topic $topic)
+    {
+        $data = $request->validate([
+            'value' => 'required|integer|in:1,-1',
+        ]);
+
+        $vote = Vote::updateOrCreate(
+            [
+                'user_id' => $request->user()->id,
+                'topic_id' => $topic->id,
+            ],
+            [
+                'value' => $data['value'],
+            ]
+        );
+
+        $totalScore = $topic->votes()->sum('value');
+
+        return response()->json([
+            'topic_id' => $topic->id,
+            'vote' => [
+                'user_id' => $vote->user_id,
+                'topic_id' => $vote->topic_id,
+                'value' => $vote->value,
+            ],
+            'total_score' => $totalScore,
         ]);
     }
 }

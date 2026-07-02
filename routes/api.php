@@ -5,6 +5,8 @@ use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\TopicController;
 use App\Http\Controllers\PostController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\CommentController;
+use App\Http\Controllers\LikeController;
 
 Route::post('register', [AuthController::class, 'register']);
 Route::post('login', [AuthController::class, 'login']);
@@ -34,6 +36,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('topics', [TopicController::class, 'store']);
     Route::put('topics/{topic}', [TopicController::class, 'update']);
     Route::delete('topics/{topic}', [TopicController::class, 'destroy']);
+    Route::post('topics/{topic}/vote', [TopicController::class, 'vote']);
+
+    Route::get('posts/{post}/comments', [CommentController::class, 'index']);
+    Route::post('posts/{post}/comments', [CommentController::class, 'store']);
+    Route::put('comments/{comment}', [CommentController::class, 'update']);
+    Route::delete('comments/{comment}', [CommentController::class, 'destroy']);
+
+    Route::post('posts/{post}/like', [LikeController::class, 'togglePostLike']);
+    Route::post('comments/{comment}/like', [LikeController::class, 'toggleCommentLike']);
 
     Route::post('posts', [PostController::class, 'store']);
     Route::put('posts/{post}', [PostController::class, 'update']);

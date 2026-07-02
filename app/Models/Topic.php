@@ -28,4 +28,9 @@ public function posts()
 {
     return $this->hasMany(Post::class);
 }
+
+public function votes()
+{
+    return $this->hasMany(Vote::class);
+}
 }
