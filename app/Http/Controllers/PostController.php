@@ -47,8 +47,9 @@ class PostController extends Controller
         $data = $request->validate([
             'body' => 'required|string',
             'topic_id' => 'required|exists:topics,id',
-            'user_id' => 'required|exists:users,id',
         ]);
+
+        $data['user_id'] = $request->user()->id;
 
         $post = Post::create($data);
 
@@ -88,10 +89,15 @@ class PostController extends Controller
      */
     public function update(Request $request, Post $post)
     {
+        if ($request->user()->role !== 'admin' && $post->user_id !== $request->user()->id) {
+            return response()->json([
+                'message' => 'Forbidden'
+            ], 403);
+        }
+
         $data = $request->validate([
             'body' => 'required|string',
             'topic_id' => 'required|exists:topics,id',
-            'user_id' => 'required|exists:users,id',
         ]);
 
         $post->update($data);
@@ -105,8 +111,14 @@ class PostController extends Controller
      * @param  \App\Models\Post  $post
      * @return \Illuminate\Http\Response
      */
-    public function destroy(Post $post)
+    public function destroy(Request $request, Post $post)
     {
+        if ($request->user()->role !== 'admin' && $post->user_id !== $request->user()->id) {
+            return response()->json([
+                'message' => 'Forbidden'
+            ], 403);
+        }
+
         $post->delete();
         return response()->json([
             'message' => 'Post deleted'
