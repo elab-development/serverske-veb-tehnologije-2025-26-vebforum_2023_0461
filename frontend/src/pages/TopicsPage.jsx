@@ -70,7 +70,12 @@ export default function TopicsPage() {
     <div className="page">
       <div className="page-header">
         <h1>Teme{categoryId ? ` u kategoriji #${categoryId}` : ""}</h1>
-        {isAuthenticated && <Link to="/topics/new">+ Nova tema</Link>}
+        <div className="page-header-actions">
+          <a href={`${import.meta.env.VITE_API_URL}/topics/export`}>
+            Izvezi u CSV
+          </a>
+          {isAuthenticated && <Link to="/topics/new">+ Nova tema</Link>}
+        </div>
       </div>
 
       <form onSubmit={handleSearch} className="toolbar">

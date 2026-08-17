@@ -8,6 +8,7 @@ use App\Models\Vote;
 use App\Services\ProfanityFilter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class TopicController extends Controller
 {
@@ -108,6 +109,39 @@ class TopicController extends Controller
             ->get();
 
         return TopicResource::collection($topics);
+    }
+
+    /**
+     * Export all topics as a CSV file, streamed in chunks to keep memory
+     * usage flat regardless of table size.
+     */
+    public function export()
+    {
+        $response = new StreamedResponse(function () {
+            $handle = fopen('php://output', 'w');
+
+            fputcsv($handle, ['id', 'title', 'body', 'category_id', 'user_id', 'created_at']);
+
+            Topic::chunk(100, function ($topics) use ($handle) {
+                foreach ($topics as $topic) {
+                    fputcsv($handle, [
+                        $topic->id,
+                        $topic->title,
+                        $topic->body,
+                        $topic->category_id,
+                        $topic->user_id,
+                        $topic->created_at,
+                    ]);
+                }
+            });
+
+            fclose($handle);
+        });
+
+        $response->headers->set('Content-Type', 'text/csv');
+        $response->headers->set('Content-Disposition', 'attachment; filename="topics.csv"');
+
+        return $response;
     }
 
     /**

@@ -18,6 +18,7 @@ Route::post('reset-password', [AuthController::class, 'resetPassword']);
 Route::apiResource('categories', CategoryController::class)->only(['index', 'show']);
 Route::get('categories/{category}/topics', [CategoryController::class, 'topics']);
 Route::get('topics', [TopicController::class, 'index']);
+Route::get('topics/export', [TopicController::class, 'export']);
 Route::get('topics/{topic}', [TopicController::class, 'show']);
 Route::get('topics/{topic}/posts', [TopicController::class, 'posts']);
 Route::get('posts', [PostController::class, 'index']);
