@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Resources\PostResource;
 use App\Models\Post;
+use App\Services\ProfanityFilter;
 use Illuminate\Http\Request;
 
 class PostController extends Controller
@@ -19,6 +20,19 @@ class PostController extends Controller
 
         if ($request->filled('body')) {
             $query->where('body', 'like', '%' . $request->input('body') . '%');
+        }
+
+        if ($request->filled('topic_id')) {
+            $query->where('topic_id', $request->input('topic_id'));
+        }
+
+        $sortable = ['created_at', 'updated_at'];
+        $sortParam = (string) $request->input('sort', '-created_at');
+        $sort = ltrim($sortParam, '-');
+        $direction = str_starts_with($sortParam, '-') ? 'desc' : 'asc';
+
+        if (in_array($sort, $sortable, true)) {
+            $query->orderBy($sort, $direction);
         }
 
         return PostResource::collection($query->paginate(10));
@@ -42,18 +56,26 @@ class PostController extends Controller
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Response
      */
-    public function store(Request $request)
+    public function store(Request $request, ProfanityFilter $profanityFilter)
     {
         $data = $request->validate([
             'body' => 'required|string',
             'topic_id' => 'required|exists:topics,id',
         ]);
 
+        if ($profanityFilter->containsProfanity($data['body'])) {
+            return response()->json([
+                'message' => 'Post content was rejected by the profanity filter.',
+            ], 422);
+        }
+
         $data['user_id'] = $request->user()->id;
 
         $post = Post::create($data);
 
-        return new PostResource($post);
+        return (new PostResource($post))
+            ->response()
+            ->setStatusCode(201);
     }
 
     /**
@@ -89,11 +111,7 @@ class PostController extends Controller
      */
     public function update(Request $request, Post $post)
     {
-        if (! in_array($request->user()->role, ['admin', 'moderator'], true) && $post->user_id !== $request->user()->id) {
-            return response()->json([
-                'message' => 'Forbidden'
-            ], 403);
-        }
+        $this->authorize('update', $post);
 
         $data = $request->validate([
             'body' => 'required|string',
@@ -113,11 +131,7 @@ class PostController extends Controller
      */
     public function destroy(Request $request, Post $post)
     {
-        if (! in_array($request->user()->role, ['admin', 'moderator'], true) && $post->user_id !== $request->user()->id) {
-            return response()->json([
-                'message' => 'Forbidden'
-            ], 403);
-        }
+        $this->authorize('delete', $post);
 
         $post->delete();
         return response()->json([

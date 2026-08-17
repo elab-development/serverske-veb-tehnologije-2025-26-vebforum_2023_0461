@@ -46,8 +46,18 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
-        'role' 
+        'role',
+        'avatar_path',
     ];
+
+    protected $appends = ['avatar_url'];
+
+    public function getAvatarUrlAttribute()
+    {
+        return $this->avatar_path
+            ? \Illuminate\Support\Facades\Storage::disk('public')->url($this->avatar_path)
+            : null;
+    }
 
     /**
      * The attributes that should be hidden for serialization.

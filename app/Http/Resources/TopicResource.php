@@ -14,6 +14,7 @@ class TopicResource extends JsonResource
             'body' => $this->body,
             'category_id' => $this->category_id,
             'user_id' => $this->user_id,
+            'vote_score' => (int) ($this->votes_sum_value ?? $this->votes()->sum('value')),
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];

@@ -7,12 +7,15 @@ use App\Http\Controllers\PostController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CommentController;
 use App\Http\Controllers\LikeController;
+use App\Http\Controllers\UserController;
+use App\Http\Controllers\DiscussionStarterController;
 
 Route::post('register', [AuthController::class, 'register']);
 Route::post('login', [AuthController::class, 'login']);
+Route::post('forgot-password', [AuthController::class, 'forgotPassword']);
+Route::post('reset-password', [AuthController::class, 'resetPassword']);
 
-Route::get('categories', [CategoryController::class, 'index']);
-Route::get('categories/{category}', [CategoryController::class, 'show']);
+Route::apiResource('categories', CategoryController::class)->only(['index', 'show']);
 Route::get('categories/{category}/topics', [CategoryController::class, 'topics']);
 Route::get('topics', [TopicController::class, 'index']);
 Route::get('topics/{topic}', [TopicController::class, 'show']);
@@ -20,17 +23,20 @@ Route::get('topics/{topic}/posts', [TopicController::class, 'posts']);
 Route::get('posts', [PostController::class, 'index']);
 Route::get('posts/{post}', [PostController::class, 'show']);
 Route::get('search/topics', [TopicController::class, 'search']);
+Route::get('statistics/topics', [TopicController::class, 'statistics']);
+Route::get('discussion-starter', [DiscussionStarterController::class, 'show']);
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('logout', [AuthController::class, 'logout']);
     Route::get('/user', function (\Illuminate\Http\Request $request) {
         return response()->json($request->user());
     });
+    Route::post('user/avatar', [UserController::class, 'uploadAvatar']);
 
     Route::middleware('admin')->group(function () {
-        Route::post('categories', [CategoryController::class, 'store']);
-        Route::put('categories/{category}', [CategoryController::class, 'update']);
-        Route::delete('categories/{category}', [CategoryController::class, 'destroy']);
+        Route::apiResource('categories', CategoryController::class)->only(['store', 'update', 'destroy']);
+        Route::get('users', [UserController::class, 'index']);
+        Route::put('users/{user}/role', [UserController::class, 'updateRole']);
     });
 
     Route::post('topics', [TopicController::class, 'store']);

@@ -2,22 +2,30 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Resources\CommentResource;
 use App\Models\Comment;
 use App\Models\Post;
+use App\Services\ProfanityFilter;
 use Illuminate\Http\Request;
 
 class CommentController extends Controller
 {
     public function index(Post $post)
     {
-        return response()->json($post->comments()->with('user')->get());
+        return CommentResource::collection($post->comments()->with('user')->latest()->get());
     }
 
-    public function store(Request $request, Post $post)
+    public function store(Request $request, Post $post, ProfanityFilter $profanityFilter)
     {
         $data = $request->validate([
             'body' => 'required|string',
         ]);
+
+        if ($profanityFilter->containsProfanity($data['body'])) {
+            return response()->json([
+                'message' => 'Comment content was rejected by the profanity filter.',
+            ], 422);
+        }
 
         $comment = Comment::create([
             'body' => $data['body'],
@@ -25,32 +33,30 @@ class CommentController extends Controller
             'post_id' => $post->id,
         ]);
 
-        return response()->json($comment, 201);
+        return (new CommentResource($comment->load('user')))
+            ->response()
+            ->setStatusCode(201);
     }
 
     public function update(Request $request, Comment $comment)
     {
-        if ($request->user()->role === 'moderator' || $request->user()->role === 'admin' || $comment->user_id === $request->user()->id) {
-            $data = $request->validate([
-                'body' => 'required|string',
-            ]);
+        $this->authorize('update', $comment);
 
-            $comment->update($data);
+        $data = $request->validate([
+            'body' => 'required|string',
+        ]);
 
-            return response()->json($comment);
-        }
+        $comment->update($data);
 
-        return response()->json(['message' => 'Forbidden'], 403);
+        return new CommentResource($comment);
     }
 
     public function destroy(Request $request, Comment $comment)
     {
-        if ($request->user()->role === 'moderator' || $request->user()->role === 'admin' || $comment->user_id === $request->user()->id) {
-            $comment->delete();
+        $this->authorize('delete', $comment);
 
-            return response()->json(['message' => 'Comment deleted']);
-        }
+        $comment->delete();
 
-        return response()->json(['message' => 'Forbidden'], 403);
+        return response()->json(['message' => 'Comment deleted']);
     }
 }

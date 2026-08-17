@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Resources\CategoryResource;
 use App\Models\Category;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 
 class CategoryController extends Controller
 {
@@ -21,7 +22,11 @@ class CategoryController extends Controller
             $query->where('name', 'like', '%' . $request->input('name') . '%');
         }
 
-        return CategoryResource::collection($query->paginate(10));
+        $cacheKey = 'categories:index:' . md5($request->getQueryString() ?? '');
+
+        $categories = Cache::remember($cacheKey, 60, fn () => $query->paginate(10));
+
+        return CategoryResource::collection($categories);
     }
 
     /**
@@ -49,7 +54,11 @@ class CategoryController extends Controller
 
         $category = Category::create($data);
 
-        return new CategoryResource($category);
+        Cache::flush();
+
+        return (new CategoryResource($category))
+            ->response()
+            ->setStatusCode(201);
     }
 
     /**
@@ -95,6 +104,8 @@ class CategoryController extends Controller
 
         $category->update($data);
 
+        Cache::flush();
+
         return new CategoryResource($category);
     }
 
@@ -106,10 +117,12 @@ class CategoryController extends Controller
      */
     public function destroy(Category $category)
     {
-         $category->delete();
+        $category->delete();
 
-    return response()->json([
-        'message' => 'Category deleted'
-    ]);
+        Cache::flush();
+
+        return response()->json([
+            'message' => 'Category deleted'
+        ]);
     }
 }

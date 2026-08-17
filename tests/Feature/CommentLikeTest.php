@@ -8,11 +8,21 @@ use App\Models\Post;
 use App\Models\Topic;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class CommentLikeTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        Http::fake([
+            'vector.profanity.dev' => Http::response(['isProfanity' => false], 200),
+        ]);
+    }
 
     public function test_authenticated_user_can_manage_comments_and_likes(): void
     {
