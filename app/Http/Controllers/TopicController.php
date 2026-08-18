@@ -19,7 +19,11 @@ class TopicController extends Controller
     {
         $data = $this->validateTopic($request);
 
-        $topic = Topic::create($data);
+        $topic = Topic::create([
+            'title' => $data['title'],
+            'body' => $data['body'],
+            'user_id' => $request->user()->id,
+        ]);
 
         return response()->json($topic->load('user'), 201);
     }
@@ -33,7 +37,11 @@ class TopicController extends Controller
     {
         $data = $this->validateTopic($request, $topic);
 
-        $topic->update($data);
+        $topic->update([
+            'title' => $data['title'],
+            'body' => $data['body'],
+            'user_id' => $request->user()->id,
+        ]);
 
         return response()->json($topic->fresh()->load('user'));
     }
@@ -50,7 +58,6 @@ class TopicController extends Controller
         $rules = [
             'title' => ['required', 'string', 'max:150'],
             'body' => ['required', 'string'],
-            'user_id' => ['required', 'exists:users,id'],
         ];
 
         $data = $request->validate($rules);

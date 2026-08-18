@@ -18,10 +18,13 @@ class PostController extends Controller
         $data = $request->validate([
             'body' => ['required', 'string'],
             'topic_id' => ['required', 'exists:topics,id'],
-            'user_id' => ['required', 'exists:users,id'],
         ]);
 
-        $post = Post::create($data);
+        $post = Post::create([
+            'body' => $data['body'],
+            'topic_id' => $data['topic_id'],
+            'user_id' => $request->user()->id,
+        ]);
 
         return response()->json($post->load(['user', 'topic']), 201);
     }
@@ -36,10 +39,21 @@ class PostController extends Controller
         $data = $request->validate([
             'body' => ['sometimes', 'required', 'string'],
             'topic_id' => ['sometimes', 'required', 'exists:topics,id'],
-            'user_id' => ['sometimes', 'required', 'exists:users,id'],
         ]);
 
-        $post->update($data);
+        $payload = [
+            'user_id' => $request->user()->id,
+        ];
+
+        if (isset($data['body'])) {
+            $payload['body'] = $data['body'];
+        }
+
+        if (isset($data['topic_id'])) {
+            $payload['topic_id'] = $data['topic_id'];
+        }
+
+        $post->update($payload);
 
         return response()->json($post->fresh()->load(['user', 'topic']));
     }

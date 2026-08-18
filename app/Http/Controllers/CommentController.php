@@ -18,12 +18,11 @@ class CommentController extends Controller
     {
         $data = $request->validate([
             'body' => ['required', 'string'],
-            'user_id' => ['required', 'exists:users,id'],
         ]);
 
         $comment = $post->comments()->create([
             'body' => $data['body'],
-            'user_id' => $data['user_id'],
+            'user_id' => $request->user()->id,
         ]);
 
         return response()->json($comment->load('user'), 201);
@@ -33,10 +32,17 @@ class CommentController extends Controller
     {
         $data = $request->validate([
             'body' => ['sometimes', 'required', 'string'],
-            'user_id' => ['sometimes', 'required', 'exists:users,id'],
         ]);
 
-        $comment->update($data);
+        $payload = [
+            'user_id' => $request->user()->id,
+        ];
+
+        if (isset($data['body'])) {
+            $payload['body'] = $data['body'];
+        }
+
+        $comment->update($payload);
 
         return response()->json($comment->fresh()->load('user'));
     }
