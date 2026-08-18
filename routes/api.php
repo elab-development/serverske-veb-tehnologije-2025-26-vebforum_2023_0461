@@ -5,6 +5,7 @@ use App\Http\Controllers\CommentController;
 use App\Http\Controllers\LikeController;
 use App\Http\Controllers\PasswordResetController;
 use App\Http\Controllers\PostController;
+use App\Http\Controllers\PublicForumServiceController;
 use App\Http\Controllers\TopicController;
 use Illuminate\Support\Facades\Route;
 
@@ -12,6 +13,8 @@ Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/forgot-password', [PasswordResetController::class, 'forgotPassword']);
 Route::post('/reset-password', [PasswordResetController::class, 'resetPassword']);
+Route::get('/public/news', [PublicForumServiceController::class, 'news']);
+Route::get('/public/weather', [PublicForumServiceController::class, 'weather']);
 
 Route::get('/topics', [TopicController::class, 'index']);
 Route::get('/topics/filter', [TopicController::class, 'filter']);
