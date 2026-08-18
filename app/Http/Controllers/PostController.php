@@ -8,9 +8,23 @@ use Illuminate\Http\Request;
 
 class PostController extends Controller
 {
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        return response()->json(Post::with(['user', 'topic'])->latest()->get());
+        $perPage = (int) $request->query('per_page', 15);
+        $search = $request->query('search');
+        $topicId = $request->query('topic_id');
+
+        $query = Post::with(['user', 'topic'])->latest();
+
+        if ($search) {
+            $query->where('body', 'like', '%' . $search . '%');
+        }
+
+        if ($topicId) {
+            $query->where('topic_id', $topicId);
+        }
+
+        return response()->json($query->paginate($perPage > 0 ? $perPage : 15));
     }
 
     public function store(Request $request): JsonResponse
@@ -63,5 +77,45 @@ class PostController extends Controller
         $post->delete();
 
         return response()->json(null, 204);
+    }
+
+    public function filter(Request $request): JsonResponse
+    {
+        $search = $request->query('search');
+        $topicId = $request->query('topic_id');
+
+        $query = Post::with(['user', 'topic'])->latest();
+
+        if ($search) {
+            $query->where('body', 'like', '%' . $search . '%');
+        }
+
+        if ($topicId) {
+            $query->where('topic_id', $topicId);
+        }
+
+        return response()->json($query->paginate(10));
+    }
+
+    public function export(): JsonResponse
+    {
+        $posts = Post::with(['user', 'topic'])->get();
+
+        $csv = "id,body,topic_id,user_id,created_at\n";
+
+        foreach ($posts as $post) {
+            $csv .= implode(',', [
+                $post->id,
+                '"' . str_replace('"', '""', $post->body) . '"',
+                $post->topic_id,
+                $post->user_id,
+                $post->created_at,
+            ]) . "\n";
+        }
+
+        return response()->json([
+            'format' => 'csv',
+            'data' => $csv,
+        ]);
     }
 }

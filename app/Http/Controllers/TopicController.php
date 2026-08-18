@@ -10,9 +10,21 @@ use Illuminate\Validation\ValidationException;
 
 class TopicController extends Controller
 {
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        return response()->json(Topic::with('user')->latest()->get());
+        $perPage = (int) $request->query('per_page', 15);
+        $search = $request->query('search');
+
+        $query = Topic::with('user')->latest();
+
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('title', 'like', '%' . $search . '%')
+                    ->orWhere('body', 'like', '%' . $search . '%');
+            });
+        }
+
+        return response()->json($query->paginate($perPage > 0 ? $perPage : 15));
     }
 
     public function store(Request $request): JsonResponse
@@ -63,5 +75,45 @@ class TopicController extends Controller
         $data = $request->validate($rules);
 
         return $data;
+    }
+
+    public function filter(Request $request): JsonResponse
+    {
+        $search = $request->query('search');
+        $userId = $request->query('user_id');
+
+        $query = Topic::with('user')->latest();
+
+        if ($search) {
+            $query->where('title', 'like', '%' . $search . '%');
+        }
+
+        if ($userId) {
+            $query->where('user_id', $userId);
+        }
+
+        return response()->json($query->paginate(10));
+    }
+
+    public function export(): JsonResponse
+    {
+        $topics = Topic::with('user')->get();
+
+        $csv = "id,title,body,user_id,created_at\n";
+
+        foreach ($topics as $topic) {
+            $csv .= implode(',', [
+                $topic->id,
+                '"' . str_replace('"', '""', $topic->title) . '"',
+                '"' . str_replace('"', '""', $topic->body) . '"',
+                $topic->user_id,
+                $topic->created_at,
+            ]) . "\n";
+        }
+
+        return response()->json([
+            'format' => 'csv',
+            'data' => $csv,
+        ]);
     }
 }
