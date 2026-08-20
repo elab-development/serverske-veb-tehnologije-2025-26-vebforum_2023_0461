@@ -8,7 +8,7 @@ use App\Http\Controllers\PostController;
 use App\Http\Controllers\PublicForumServiceController;
 use App\Http\Controllers\TopicController;
 use Illuminate\Support\Facades\Route;
-
+use App\Http\Controllers\StatisticsController;
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/forgot-password', [PasswordResetController::class, 'forgotPassword']);
@@ -47,3 +47,4 @@ Route::middleware('auth:sanctum')->group(function () {
 
 Route::apiResource('topics', TopicController::class)->only(['index', 'show']);
 Route::apiResource('posts', PostController::class)->only(['index', 'show']);
+Route::get('/statistics/topics', [StatisticsController::class, 'topics']);
