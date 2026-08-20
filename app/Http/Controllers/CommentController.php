@@ -30,13 +30,20 @@ class CommentController extends Controller
 
     public function update(Request $request, Comment $comment): JsonResponse
     {
+        if (
+    $comment->user_id !== $request->user()->id &&
+    !in_array($request->user()->role, ['moderator', 'admin'])
+) {
+    return response()->json([
+        'message' => 'Nemate dozvolu da izmenite ovaj komentar.'
+    ], 403);
+}
+
         $data = $request->validate([
             'body' => ['sometimes', 'required', 'string'],
         ]);
 
-        $payload = [
-            'user_id' => $request->user()->id,
-        ];
+        $payload = [];
 
         if (isset($data['body'])) {
             $payload['body'] = $data['body'];
@@ -47,8 +54,17 @@ class CommentController extends Controller
         return response()->json($comment->fresh()->load('user'));
     }
 
-    public function destroy(Comment $comment): JsonResponse
+    public function destroy(Request $request, Comment $comment): JsonResponse
     {
+        if (
+    $comment->user_id !== $request->user()->id &&
+    !in_array($request->user()->role, ['moderator', 'admin'])
+) {
+    return response()->json([
+        'message' => 'Nemate dozvolu da obrišete ovaj komentar.'
+    ], 403);
+}
+
         $comment->delete();
 
         return response()->json(null, 204);

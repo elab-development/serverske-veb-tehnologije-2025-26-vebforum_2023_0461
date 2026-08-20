@@ -50,14 +50,21 @@ class PostController extends Controller
 
     public function update(Request $request, Post $post): JsonResponse
     {
+       if (
+    $post->user_id !== $request->user()->id &&
+    !in_array($request->user()->role, ['moderator', 'admin'])
+) {
+    return response()->json([
+        'message' => 'Nemate dozvolu za ovu akciju.'
+    ], 403);
+}
+
         $data = $request->validate([
             'body' => ['sometimes', 'required', 'string'],
             'topic_id' => ['sometimes', 'required', 'exists:topics,id'],
         ]);
 
-        $payload = [
-            'user_id' => $request->user()->id,
-        ];
+        $payload = [];
 
         if (isset($data['body'])) {
             $payload['body'] = $data['body'];
@@ -72,8 +79,17 @@ class PostController extends Controller
         return response()->json($post->fresh()->load(['user', 'topic']));
     }
 
-    public function destroy(Post $post): JsonResponse
+    public function destroy(Request $request, Post $post): JsonResponse
     {
+        if (
+    $post->user_id !== $request->user()->id &&
+    !in_array($request->user()->role, ['moderator', 'admin'])
+) {
+    return response()->json([
+        'message' => 'Nemate dozvolu za ovu akciju.'
+    ], 403);
+}
+
         $post->delete();
 
         return response()->json(null, 204);
