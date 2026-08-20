@@ -2,61 +2,71 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Resources\CommentResource;
 use App\Models\Comment;
 use App\Models\Post;
-use App\Services\ProfanityFilter;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class CommentController extends Controller
 {
-    public function index(Post $post)
+    public function index(Post $post): JsonResponse
     {
-        return CommentResource::collection($post->comments()->with('user')->latest()->get());
+        return response()->json($post->comments()->with('user')->latest()->get());
     }
 
-    public function store(Request $request, Post $post, ProfanityFilter $profanityFilter)
+    public function store(Request $request, Post $post): JsonResponse
     {
         $data = $request->validate([
-            'body' => 'required|string',
+            'body' => ['required', 'string'],
         ]);
 
-        if ($profanityFilter->containsProfanity($data['body'])) {
-            return response()->json([
-                'message' => 'Comment content was rejected by the profanity filter.',
-            ], 422);
-        }
-
-        $comment = Comment::create([
+        $comment = $post->comments()->create([
             'body' => $data['body'],
             'user_id' => $request->user()->id,
-            'post_id' => $post->id,
         ]);
 
-        return (new CommentResource($comment->load('user')))
-            ->response()
-            ->setStatusCode(201);
+        return response()->json($comment->load('user'), 201);
     }
 
-    public function update(Request $request, Comment $comment)
+    public function update(Request $request, Comment $comment): JsonResponse
     {
-        $this->authorize('update', $comment);
+        if (
+    $comment->user_id !== $request->user()->id &&
+    !in_array($request->user()->role, ['moderator', 'admin'])
+) {
+    return response()->json([
+        'message' => 'Nemate dozvolu da izmenite ovaj komentar.'
+    ], 403);
+}
 
         $data = $request->validate([
-            'body' => 'required|string',
+            'body' => ['sometimes', 'required', 'string'],
         ]);
 
-        $comment->update($data);
+        $payload = [];
 
-        return new CommentResource($comment);
+        if (isset($data['body'])) {
+            $payload['body'] = $data['body'];
+        }
+
+        $comment->update($payload);
+
+        return response()->json($comment->fresh()->load('user'));
     }
 
-    public function destroy(Request $request, Comment $comment)
+    public function destroy(Request $request, Comment $comment): JsonResponse
     {
-        $this->authorize('delete', $comment);
+        if (
+    $comment->user_id !== $request->user()->id &&
+    !in_array($request->user()->role, ['moderator', 'admin'])
+) {
+    return response()->json([
+        'message' => 'Nemate dozvolu da obrišete ovaj komentar.'
+    ], 403);
+}
 
         $comment->delete();
 
-        return response()->json(['message' => 'Comment deleted']);
+        return response()->json(null, 204);
     }
 }

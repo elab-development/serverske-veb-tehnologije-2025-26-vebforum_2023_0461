@@ -9,20 +9,19 @@ class Comment extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['body', 'user_id', 'post_id'];
-
-    public function user()
-    {
-        return $this->belongsTo(User::class);
-    }
+    protected $fillable = [
+        'body',
+        'post_id',
+        'user_id',
+    ];
 
     public function post()
     {
         return $this->belongsTo(Post::class);
     }
 
-    public function likes()
+    public function user()
     {
-        return $this->hasMany(Like::class);
+        return $this->belongsTo(User::class);
     }
 }

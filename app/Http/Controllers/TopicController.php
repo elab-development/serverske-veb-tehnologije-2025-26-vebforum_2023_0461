@@ -2,278 +2,157 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Resources\TopicResource;
 use App\Models\Topic;
-use App\Models\Vote;
-use App\Services\ProfanityFilter;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class TopicController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     *
-     * @return \Illuminate\Http\Response
-     */
-    public function index(Request $request)
-    {
-        $query = Topic::query()->withSum('votes', 'value');
 
-        if ($request->filled('title')) {
-            $query->where('title', 'like', '%' . $request->input('title') . '%');
-        }
+public function posts(Topic $topic): JsonResponse
+{
+    return response()->json(
+        $topic->posts()->with('user')->latest()->get()
+    );
+}
+ public function index(Request $request): JsonResponse
+{
+    $perPage = (int) $request->query('per_page', 15);
+    $search = $request->query('search');
 
-        if ($request->filled('category_id')) {
-            $query->where('category_id', $request->input('category_id'));
-        }
+    $sortBy = $request->query('sort_by', 'created_at');
+    $sortOrder = $request->query('sort_order', 'desc');
 
-        $sortable = ['title', 'created_at', 'updated_at'];
-        $sort = ltrim((string) $request->input('sort', '-created_at'), '-');
-        $direction = str_starts_with((string) $request->input('sort', '-created_at'), '-') ? 'desc' : 'asc';
+    $allowedSorts = ['title', 'created_at'];
 
-        if (in_array($sort, $sortable, true)) {
-            $query->orderBy($sort, $direction);
-        }
-
-        return TopicResource::collection($query->paginate(10));
+    if (!in_array($sortBy, $allowedSorts)) {
+        $sortBy = 'created_at';
     }
 
-    /**
-     * Show the form for creating a new resource.
-     *
-     * @return \Illuminate\Http\Response
-     */
-    public function create()
-    {
-        return response()->json([
-            'message' => 'Create topic form'
-        ]);
+    if (!in_array($sortOrder, ['asc', 'desc'])) {
+        $sortOrder = 'desc';
     }
 
-    /**
-     * Store a newly created resource in storage.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\Response
-     */
-    public function store(Request $request, ProfanityFilter $profanityFilter)
-    {
-        $data = $request->validate([
-            'title' => 'required|string|max:200',
-            'body' => 'required|string',
-            'category_id' => 'required|exists:categories,id',
-        ]);
+    $query = Topic::with('user');
 
-        if ($profanityFilter->containsProfanity($data['title'] . ' ' . $data['body'])) {
-            return response()->json([
-                'message' => 'Topic content was rejected by the profanity filter.',
-            ], 422);
-        }
-
-        $data['user_id'] = $request->user()->id;
-        $topic = Topic::create($data);
-
-        return (new TopicResource($topic))
-            ->response()
-            ->setStatusCode(201);
-    }
-
-    /**
-     * Display the specified resource.
-     *
-     * @param  \App\Models\Topic  $topic
-     * @return \Illuminate\Http\Response
-     */
-    public function show(Topic $topic)
-    {
-        $topic->loadSum('votes', 'value');
-
-        return new TopicResource($topic);
-    }
-
-    public function posts(Topic $topic)
-    {
-        return response()->json($topic->posts);
-    }
-
-    public function search(Request $request)
-    {
-        $data = $request->validate([
-            'query' => 'required|string'
-        ]);
-
-        $topics = Topic::where('title', 'like', '%' . $data['query'] . '%')
-            ->orWhere('body', 'like', '%' . $data['query'] . '%')
-            ->get();
-
-        return TopicResource::collection($topics);
-    }
-
-    /**
-     * Export all topics as a CSV file, streamed in chunks to keep memory
-     * usage flat regardless of table size.
-     */
-    public function export()
-    {
-        $response = new StreamedResponse(function () {
-            $handle = fopen('php://output', 'w');
-
-            fputcsv($handle, ['id', 'title', 'body', 'category_id', 'user_id', 'created_at']);
-
-            Topic::chunk(100, function ($topics) use ($handle) {
-                foreach ($topics as $topic) {
-                    fputcsv($handle, [
-                        $topic->id,
-                        $topic->title,
-                        $topic->body,
-                        $topic->category_id,
-                        $topic->user_id,
-                        $topic->created_at,
-                    ]);
-                }
-            });
-
-            fclose($handle);
+    if ($search) {
+        $query->where(function ($q) use ($search) {
+            $q->where('title', 'like', '%' . $search . '%')
+                ->orWhere('body', 'like', '%' . $search . '%');
         });
-
-        $response->headers->set('Content-Type', 'text/csv');
-        $response->headers->set('Content-Disposition', 'attachment; filename="topics.csv"');
-
-        return $response;
     }
 
-    /**
-     * Show the form for editing the specified resource.
-     *
-     * @param  \App\Models\Topic  $topic
-     * @return \Illuminate\Http\Response
-     */
-    public function edit(Topic $topic)
+    $query->orderBy($sortBy, $sortOrder);
+
+    return response()->json(
+        $query->paginate($perPage > 0 ? $perPage : 15)
+    );
+}
+
+    public function store(Request $request): JsonResponse
     {
+        $data = $this->validateTopic($request);
+
+        $topic = Topic::create([
+            'title' => $data['title'],
+            'body' => $data['body'],
+            'user_id' => $request->user()->id,
+        ]);
+
+        return response()->json($topic->load('user'), 201);
+    }
+
+    public function show(Topic $topic): JsonResponse
+    {
+        return response()->json($topic->load('user'));
+    }
+
+   public function update(Request $request, Topic $topic): JsonResponse
+{
+    if (
+    $topic->user_id !== $request->user()->id &&
+    !in_array($request->user()->role, ['moderator', 'admin'])
+) {
+    return response()->json([
+        'message' => 'Nemate dozvolu za ovu akciju.'
+    ], 403);
+}
+
+    $data = $this->validateTopic($request, $topic);
+
+    $topic->update([
+        'title' => $data['title'],
+        'body' => $data['body'],
+    ]);
+
+    return response()->json($topic->fresh()->load('user'));
+}
+
+  public function destroy(Request $request, Topic $topic): JsonResponse
+{
+    if (
+    $topic->user_id !== $request->user()->id &&
+    !in_array($request->user()->role, ['moderator', 'admin'])
+) {
+    return response()->json([
+        'message' => 'Nemate dozvolu za ovu akciju.'
+    ], 403);
+}
+
+    $topic->delete();
+
+    return response()->json(null, 204);
+}
+
+    protected function validateTopic(Request $request, ?Topic $topic = null): array
+    {
+        $rules = [
+            'title' => ['required', 'string', 'max:150'],
+            'body' => ['required', 'string'],
+        ];
+
+        $data = $request->validate($rules);
+
+        return $data;
+    }
+
+    public function filter(Request $request): JsonResponse
+    {
+        $search = $request->query('search');
+        $userId = $request->query('user_id');
+
+        $query = Topic::with('user')->latest();
+
+        if ($search) {
+            $query->where('title', 'like', '%' . $search . '%');
+        }
+
+        if ($userId) {
+            $query->where('user_id', $userId);
+        }
+
+        return response()->json($query->paginate(10));
+    }
+
+    public function export(): JsonResponse
+    {
+        $topics = Topic::with('user')->get();
+
+        $csv = "id,title,body,user_id,created_at\n";
+
+        foreach ($topics as $topic) {
+            $csv .= implode(',', [
+                $topic->id,
+                '"' . str_replace('"', '""', $topic->title) . '"',
+                '"' . str_replace('"', '""', $topic->body) . '"',
+                $topic->user_id,
+                $topic->created_at,
+            ]) . "\n";
+        }
+
         return response()->json([
-            'message' => 'Edit topic form'
+            'format' => 'csv',
+            'data' => $csv,
         ]);
-    }
-
-    /**
-     * Update the specified resource in storage.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  \App\Models\Topic  $topic
-     * @return \Illuminate\Http\Response
-     */
-    public function update(Request $request, Topic $topic)
-    {
-        $this->authorize('update', $topic);
-
-        $data = $request->validate([
-            'title' => 'required|string|max:200',
-            'body' => 'required|string',
-            'category_id' => 'required|exists:categories,id',
-        ]);
-
-        $topic->update($data);
-
-        return new TopicResource($topic);
-    }
-
-    /**
-     * Remove the specified resource from storage.
-     *
-     * @param  \App\Models\Topic  $topic
-     * @return \Illuminate\Http\Response
-     */
-    public function destroy(Request $request, Topic $topic)
-    {
-        $this->authorize('delete', $topic);
-
-        DB::transaction(function () use ($topic) {
-            foreach ($topic->posts as $post) {
-                $post->likes()->delete();
-
-                foreach ($post->comments as $comment) {
-                    $comment->likes()->delete();
-                    $comment->delete();
-                }
-
-                $post->delete();
-            }
-
-            $topic->votes()->delete();
-            $topic->delete();
-        });
-
-        return response()->json([
-            'message' => 'Topic deleted'
-        ]);
-    }
-
-    public function vote(Request $request, Topic $topic)
-    {
-        $data = $request->validate([
-            'value' => 'required|integer|in:1,-1',
-        ]);
-
-        [$vote, $totalScore] = DB::transaction(function () use ($request, $topic, $data) {
-            $vote = Vote::updateOrCreate(
-                [
-                    'user_id' => $request->user()->id,
-                    'topic_id' => $topic->id,
-                ],
-                [
-                    'value' => $data['value'],
-                ]
-            );
-
-            return [$vote, $topic->votes()->sum('value')];
-        });
-
-        return response()->json([
-            'topic_id' => $topic->id,
-            'vote' => [
-                'user_id' => $vote->user_id,
-                'topic_id' => $vote->topic_id,
-                'value' => $vote->value,
-            ],
-            'total_score' => $totalScore,
-        ]);
-    }
-
-    /**
-     * Aggregated topic statistics: joins topics with per-topic post counts,
-     * comment counts and vote score, each pre-aggregated in its own subquery
-     * to avoid the row-multiplication that a single multi-table join would cause.
-     */
-    public function statistics()
-    {
-        $postCounts = DB::table('posts')
-            ->select('topic_id', DB::raw('COUNT(*) as posts_count'))
-            ->groupBy('topic_id');
-
-        $commentCounts = DB::table('comments')
-            ->join('posts', 'posts.id', '=', 'comments.post_id')
-            ->select('posts.topic_id', DB::raw('COUNT(comments.id) as comments_count'))
-            ->groupBy('posts.topic_id');
-
-        $voteScores = DB::table('votes')
-            ->select('topic_id', DB::raw('SUM(value) as score'))
-            ->groupBy('topic_id');
-
-        $topics = Topic::query()
-            ->select('topics.id', 'topics.title', 'topics.category_id', 'categories.name as category_name')
-            ->join('categories', 'categories.id', '=', 'topics.category_id')
-            ->leftJoinSub($postCounts, 'post_counts', 'post_counts.topic_id', '=', 'topics.id')
-            ->leftJoinSub($commentCounts, 'comment_counts', 'comment_counts.topic_id', '=', 'topics.id')
-            ->leftJoinSub($voteScores, 'vote_scores', 'vote_scores.topic_id', '=', 'topics.id')
-            ->selectRaw('COALESCE(post_counts.posts_count, 0) as posts_count')
-            ->selectRaw('COALESCE(comment_counts.comments_count, 0) as comments_count')
-            ->selectRaw('COALESCE(vote_scores.score, 0) as score')
-            ->orderByDesc('score')
-            ->limit(10)
-            ->get();
-
-        return response()->json(['data' => $topics]);
     }
 }

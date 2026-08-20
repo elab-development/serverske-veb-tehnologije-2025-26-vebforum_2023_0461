@@ -2,140 +2,136 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Resources\PostResource;
 use App\Models\Post;
-use App\Services\ProfanityFilter;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class PostController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     *
-     * @return \Illuminate\Http\Response
-     */
-    public function index(Request $request)
+    public function index(Request $request): JsonResponse
     {
-        $query = Post::query();
+        $perPage = (int) $request->query('per_page', 15);
+        $search = $request->query('search');
+        $topicId = $request->query('topic_id');
 
-        if ($request->filled('body')) {
-            $query->where('body', 'like', '%' . $request->input('body') . '%');
+        $query = Post::with(['user', 'topic'])->latest();
+
+        if ($search) {
+            $query->where('body', 'like', '%' . $search . '%');
         }
 
-        if ($request->filled('topic_id')) {
-            $query->where('topic_id', $request->input('topic_id'));
+        if ($topicId) {
+            $query->where('topic_id', $topicId);
         }
 
-        $sortable = ['created_at', 'updated_at'];
-        $sortParam = (string) $request->input('sort', '-created_at');
-        $sort = ltrim($sortParam, '-');
-        $direction = str_starts_with($sortParam, '-') ? 'desc' : 'asc';
-
-        if (in_array($sort, $sortable, true)) {
-            $query->orderBy($sort, $direction);
-        }
-
-        return PostResource::collection($query->paginate(10));
+        return response()->json($query->paginate($perPage > 0 ? $perPage : 15));
     }
 
-    /**
-     * Show the form for creating a new resource.
-     *
-     * @return \Illuminate\Http\Response
-     */
-    public function create()
-    {
-        return response()->json([
-            'message' => 'Create post form'
-        ]);
-    }
-
-    /**
-     * Store a newly created resource in storage.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\Response
-     */
-    public function store(Request $request, ProfanityFilter $profanityFilter)
+    public function store(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'body' => 'required|string',
-            'topic_id' => 'required|exists:topics,id',
+            'body' => ['required', 'string'],
+            'topic_id' => ['required', 'exists:topics,id'],
         ]);
 
-        if ($profanityFilter->containsProfanity($data['body'])) {
-            return response()->json([
-                'message' => 'Post content was rejected by the profanity filter.',
-            ], 422);
-        }
-
-        $data['user_id'] = $request->user()->id;
-
-        $post = Post::create($data);
-
-        return (new PostResource($post))
-            ->response()
-            ->setStatusCode(201);
-    }
-
-    /**
-     * Display the specified resource.
-     *
-     * @param  \App\Models\Post  $post
-     * @return \Illuminate\Http\Response
-     */
-    public function show(Post $post)
-    {
-        return new PostResource($post);
-    }
-
-    /**
-     * Show the form for editing the specified resource.
-     *
-     * @param  \App\Models\Post  $post
-     * @return \Illuminate\Http\Response
-     */
-    public function edit(Post $post)
-    {
-        return response()->json([
-            'message' => 'Edit post form'
+        $post = Post::create([
+            'body' => $data['body'],
+            'topic_id' => $data['topic_id'],
+            'user_id' => $request->user()->id,
         ]);
+
+        return response()->json($post->load(['user', 'topic']), 201);
     }
 
-    /**
-     * Update the specified resource in storage.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  \App\Models\Post  $post
-     * @return \Illuminate\Http\Response
-     */
-    public function update(Request $request, Post $post)
+    public function show(Post $post): JsonResponse
     {
-        $this->authorize('update', $post);
+        return response()->json($post->load(['user', 'topic']));
+    }
+
+    public function update(Request $request, Post $post): JsonResponse
+    {
+       if (
+    $post->user_id !== $request->user()->id &&
+    !in_array($request->user()->role, ['moderator', 'admin'])
+) {
+    return response()->json([
+        'message' => 'Nemate dozvolu za ovu akciju.'
+    ], 403);
+}
 
         $data = $request->validate([
-            'body' => 'required|string',
-            'topic_id' => 'required|exists:topics,id',
+            'body' => ['sometimes', 'required', 'string'],
+            'topic_id' => ['sometimes', 'required', 'exists:topics,id'],
         ]);
 
-        $post->update($data);
+        $payload = [];
 
-        return new PostResource($post);
+        if (isset($data['body'])) {
+            $payload['body'] = $data['body'];
+        }
+
+        if (isset($data['topic_id'])) {
+            $payload['topic_id'] = $data['topic_id'];
+        }
+
+        $post->update($payload);
+
+        return response()->json($post->fresh()->load(['user', 'topic']));
     }
 
-    /**
-     * Remove the specified resource from storage.
-     *
-     * @param  \App\Models\Post  $post
-     * @return \Illuminate\Http\Response
-     */
-    public function destroy(Request $request, Post $post)
+    public function destroy(Request $request, Post $post): JsonResponse
     {
-        $this->authorize('delete', $post);
+        if (
+    $post->user_id !== $request->user()->id &&
+    !in_array($request->user()->role, ['moderator', 'admin'])
+) {
+    return response()->json([
+        'message' => 'Nemate dozvolu za ovu akciju.'
+    ], 403);
+}
 
         $post->delete();
+
+        return response()->json(null, 204);
+    }
+
+    public function filter(Request $request): JsonResponse
+    {
+        $search = $request->query('search');
+        $topicId = $request->query('topic_id');
+
+        $query = Post::with(['user', 'topic'])->latest();
+
+        if ($search) {
+            $query->where('body', 'like', '%' . $search . '%');
+        }
+
+        if ($topicId) {
+            $query->where('topic_id', $topicId);
+        }
+
+        return response()->json($query->paginate(10));
+    }
+
+    public function export(): JsonResponse
+    {
+        $posts = Post::with(['user', 'topic'])->get();
+
+        $csv = "id,body,topic_id,user_id,created_at\n";
+
+        foreach ($posts as $post) {
+            $csv .= implode(',', [
+                $post->id,
+                '"' . str_replace('"', '""', $post->body) . '"',
+                $post->topic_id,
+                $post->user_id,
+                $post->created_at,
+            ]) . "\n";
+        }
+
         return response()->json([
-            'message' => 'Post deleted'
+            'format' => 'csv',
+            'data' => $csv,
         ]);
     }
 }
