@@ -15,22 +15,39 @@ public function posts(Topic $topic): JsonResponse
         $topic->posts()->with('user')->latest()->get()
     );
 }
-    public function index(Request $request): JsonResponse
-    {
-        $perPage = (int) $request->query('per_page', 15);
-        $search = $request->query('search');
+ public function index(Request $request): JsonResponse
+{
+    $perPage = (int) $request->query('per_page', 15);
+    $search = $request->query('search');
 
-        $query = Topic::with('user')->latest();
+    $sortBy = $request->query('sort_by', 'created_at');
+    $sortOrder = $request->query('sort_order', 'desc');
 
-        if ($search) {
-            $query->where(function ($q) use ($search) {
-                $q->where('title', 'like', '%' . $search . '%')
-                    ->orWhere('body', 'like', '%' . $search . '%');
-            });
-        }
+    $allowedSorts = ['title', 'created_at'];
 
-        return response()->json($query->paginate($perPage > 0 ? $perPage : 15));
+    if (!in_array($sortBy, $allowedSorts)) {
+        $sortBy = 'created_at';
     }
+
+    if (!in_array($sortOrder, ['asc', 'desc'])) {
+        $sortOrder = 'desc';
+    }
+
+    $query = Topic::with('user');
+
+    if ($search) {
+        $query->where(function ($q) use ($search) {
+            $q->where('title', 'like', '%' . $search . '%')
+                ->orWhere('body', 'like', '%' . $search . '%');
+        });
+    }
+
+    $query->orderBy($sortBy, $sortOrder);
+
+    return response()->json(
+        $query->paginate($perPage > 0 ? $perPage : 15)
+    );
+}
 
     public function store(Request $request): JsonResponse
     {
@@ -52,11 +69,14 @@ public function posts(Topic $topic): JsonResponse
 
    public function update(Request $request, Topic $topic): JsonResponse
 {
-    if ($topic->user_id !== $request->user()->id && $request->user()->role !== 'admin') {
-        return response()->json([
-            'message' => 'Nemate dozvolu za izmenu ove teme.'
-        ], 403);
-    }
+    if (
+    $topic->user_id !== $request->user()->id &&
+    !in_array($request->user()->role, ['moderator', 'admin'])
+) {
+    return response()->json([
+        'message' => 'Nemate dozvolu za ovu akciju.'
+    ], 403);
+}
 
     $data = $this->validateTopic($request, $topic);
 
@@ -70,11 +90,14 @@ public function posts(Topic $topic): JsonResponse
 
   public function destroy(Request $request, Topic $topic): JsonResponse
 {
-    if ($topic->user_id !== $request->user()->id && $request->user()->role !== 'admin') {
-        return response()->json([
-            'message' => 'Nemate dozvolu za brisanje ove teme.'
-        ], 403);
-    }
+    if (
+    $topic->user_id !== $request->user()->id &&
+    !in_array($request->user()->role, ['moderator', 'admin'])
+) {
+    return response()->json([
+        'message' => 'Nemate dozvolu za ovu akciju.'
+    ], 403);
+}
 
     $topic->delete();
 
