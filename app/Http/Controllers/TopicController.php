@@ -5,8 +5,6 @@ namespace App\Http\Controllers;
 use App\Models\Topic;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
-use Illuminate\Validation\ValidationException;
 
 class TopicController extends Controller
 {
@@ -45,25 +43,36 @@ class TopicController extends Controller
         return response()->json($topic->load('user'));
     }
 
-    public function update(Request $request, Topic $topic): JsonResponse
-    {
-        $data = $this->validateTopic($request, $topic);
-
-        $topic->update([
-            'title' => $data['title'],
-            'body' => $data['body'],
-            'user_id' => $request->user()->id,
-        ]);
-
-        return response()->json($topic->fresh()->load('user'));
+   public function update(Request $request, Topic $topic): JsonResponse
+{
+    if ($topic->user_id !== $request->user()->id && $request->user()->role !== 'admin') {
+        return response()->json([
+            'message' => 'Nemate dozvolu za izmenu ove teme.'
+        ], 403);
     }
 
-    public function destroy(Topic $topic): JsonResponse
-    {
-        $topic->delete();
+    $data = $this->validateTopic($request, $topic);
 
-        return response()->json(null, 204);
+    $topic->update([
+        'title' => $data['title'],
+        'body' => $data['body'],
+    ]);
+
+    return response()->json($topic->fresh()->load('user'));
+}
+
+  public function destroy(Request $request, Topic $topic): JsonResponse
+{
+    if ($topic->user_id !== $request->user()->id && $request->user()->role !== 'admin') {
+        return response()->json([
+            'message' => 'Nemate dozvolu za brisanje ove teme.'
+        ], 403);
     }
+
+    $topic->delete();
+
+    return response()->json(null, 204);
+}
 
     protected function validateTopic(Request $request, ?Topic $topic = null): array
     {
