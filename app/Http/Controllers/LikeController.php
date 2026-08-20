@@ -6,6 +6,7 @@ use App\Models\Like;
 use App\Models\Post;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class LikeController extends Controller
 {
@@ -13,28 +14,42 @@ class LikeController extends Controller
     {
         $userId = $request->user()->id;
 
-        $existingLike = $post->likes()->where('user_id', $userId)->first();
+        try {
+            $result = DB::transaction(function () use ($post, $userId) {
+                $existingLike = $post->likes()
+                    ->where('user_id', $userId)
+                    ->lockForUpdate()
+                    ->first();
 
-        if ($existingLike) {
-            $existingLike->delete();
+                if ($existingLike) {
+                    $existingLike->delete();
 
+                    return [
+                        'post_id' => $post->id,
+                        'user_id' => $userId,
+                        'liked' => false,
+                    ];
+                }
+
+                $like = Like::create([
+                    'post_id' => $post->id,
+                    'user_id' => $userId,
+                ]);
+
+                return [
+                    'id' => $like->id,
+                    'post_id' => $post->id,
+                    'user_id' => $userId,
+                    'liked' => true,
+                ];
+            });
+
+            return response()->json($result);
+        } catch (\Exception $e) {
             return response()->json([
-                'post_id' => $post->id,
-                'user_id' => $userId,
-                'liked' => false,
-            ]);
+                'message' => 'Greška pri lajkovanju posta.',
+                'error' => $e->getMessage(),
+            ], 500);
         }
-
-        $like = Like::create([
-            'post_id' => $post->id,
-            'user_id' => $userId,
-        ]);
-
-        return response()->json([
-            'id' => $like->id,
-            'post_id' => $post->id,
-            'user_id' => $userId,
-            'liked' => true,
-        ]);
     }
 }
