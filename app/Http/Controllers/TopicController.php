@@ -8,6 +8,13 @@ use Illuminate\Http\Request;
 
 class TopicController extends Controller
 {
+
+public function posts(Topic $topic): JsonResponse
+{
+    return response()->json(
+        $topic->posts()->with('user')->latest()->get()
+    );
+}
     public function index(Request $request): JsonResponse
     {
         $perPage = (int) $request->query('per_page', 15);

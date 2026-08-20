@@ -13,9 +13,10 @@ Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/forgot-password', [PasswordResetController::class, 'forgotPassword']);
 Route::post('/reset-password', [PasswordResetController::class, 'resetPassword']);
+Route::get('/external/stories', [PublicForumServiceController::class, 'stories']);
 Route::get('/public/news', [PublicForumServiceController::class, 'news']);
 Route::get('/public/weather', [PublicForumServiceController::class, 'weather']);
-
+Route::get('topics/{topic}/posts', [TopicController::class, 'posts']);
 Route::get('/topics', [TopicController::class, 'index']);
 Route::get('/topics/filter', [TopicController::class, 'filter']);
 Route::get('/topics/{topic}', [TopicController::class, 'show']);
