@@ -1,0 +1,1482 @@
+openapi: 3.0.3
+
+info:
+  title: Veb Forum API
+  version: 1.0.0
+  description: |
+    Detaljna REST API dokumentacija za Laravel aplikaciju Veb Forum.
+
+    Za JSON zahteve koristiti:
+    - Accept: application/json
+    - Content-Type: application/json
+
+    Za zaštićene rute dodatno koristiti:
+    - Authorization: Bearer {token}
+
+servers:
+  - url: http://127.0.0.1:8000/api
+    description: Lokalni razvojni server
+
+tags:
+  - name: Auth
+    description: Registracija, prijava i odjava korisnika.
+  - name: Password
+    description: Funkcionalnosti za zaboravljenu i resetovanu lozinku.
+  - name: Topics
+    description: Upravljanje temama foruma.
+  - name: Posts
+    description: Upravljanje postovima.
+  - name: Comments
+    description: Upravljanje komentarima.
+  - name: Likes
+    description: Lajkovanje i uklanjanje lajka sa posta.
+  - name: Statistics
+    description: Statistički podaci dobijeni složenim upitima.
+  - name: Public services
+    description: Integracija sa javnim REST servisima.
+  - name: Admin
+    description: Administratorske funkcionalnosti.
+
+paths:
+
+  /register:
+    post:
+      tags: [Auth]
+      summary: Registracija korisnika
+      description: |
+        Kreira novi korisnički nalog.
+
+        Potrebna zaglavlja:
+        - Accept: application/json
+        - Content-Type: application/json
+      operationId: registerUser
+      parameters:
+        - $ref: '#/components/parameters/AcceptHeader'
+      requestBody:
+        required: true
+        description: Podaci potrebni za registraciju korisnika.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+            example:
+              name: Masa
+              email: masa@example.com
+              password: password123
+              password_confirmation: password123
+      responses:
+        '201':
+          description: Korisnik je uspešno registrovan.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+              example:
+                message: Uspešna registracija.
+                user:
+                  id: 1
+                  name: Masa
+                  email: masa@example.com
+                  role: user
+                token: 1|exampleToken
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /login:
+    post:
+      tags: [Auth]
+      summary: Prijavljivanje korisnika
+      description: |
+        Proverava email adresu i lozinku korisnika i vraća Sanctum Bearer token.
+
+        Potrebna zaglavlja:
+        - Accept: application/json
+        - Content-Type: application/json
+      operationId: loginUser
+      parameters:
+        - $ref: '#/components/parameters/AcceptHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            example:
+              email: masa@example.com
+              password: password123
+      responses:
+        '200':
+          description: Uspešno prijavljivanje.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /logout:
+    post:
+      tags: [Auth]
+      summary: Odjavljivanje korisnika
+      description: |
+        Briše trenutni Sanctum token prijavljenog korisnika.
+
+        Potrebna zaglavlja:
+        - Accept: application/json
+        - Authorization: Bearer {token}
+      operationId: logoutUser
+      security:
+        - sanctum: []
+      parameters:
+        - $ref: '#/components/parameters/AcceptHeader'
+      responses:
+        '200':
+          description: Korisnik je uspešno odjavljen.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+              example:
+                message: Uspešna odjava.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /forgot-password:
+    post:
+      tags: [Password]
+      summary: Zahtev za reset lozinke
+      description: |
+        Pokreće proces promene zaboravljene lozinke za prosleđenu email adresu.
+
+        Potrebna zaglavlja:
+        - Accept: application/json
+        - Content-Type: application/json
+      operationId: forgotPassword
+      parameters:
+        - $ref: '#/components/parameters/AcceptHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: masa@example.com
+      responses:
+        '200':
+          description: Zahtev za reset lozinke je obrađen.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /reset-password:
+    post:
+      tags: [Password]
+      summary: Resetovanje lozinke
+      description: |
+        Postavlja novu lozinku na osnovu email adrese i tokena za reset.
+
+        Potrebna zaglavlja:
+        - Accept: application/json
+        - Content-Type: application/json
+      operationId: resetPassword
+      parameters:
+        - $ref: '#/components/parameters/AcceptHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetPasswordRequest'
+      responses:
+        '200':
+          description: Lozinka je uspešno promenjena.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /topics:
+    get:
+      tags: [Topics]
+      summary: Prikaz svih tema
+      description: |
+        Vraća paginiranu listu tema. Podržava pretragu, sortiranje i izbor broja elemenata po strani.
+
+        Potrebno zaglavlje:
+        - Accept: application/json
+      operationId: listTopics
+      parameters:
+        - $ref: '#/components/parameters/AcceptHeader'
+        - in: query
+          name: per_page
+          description: Broj tema po strani.
+          schema:
+            type: integer
+            default: 15
+            minimum: 1
+        - in: query
+          name: search
+          description: Tekst za pretragu naslova ili sadržaja teme.
+          schema:
+            type: string
+          example: Laravel
+        - in: query
+          name: sort_by
+          description: Polje po kojem se teme sortiraju.
+          schema:
+            type: string
+            enum: [title, created_at]
+            default: created_at
+        - in: query
+          name: sort_order
+          description: Smer sortiranja.
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+      responses:
+        '200':
+          description: Paginirana lista tema u JSON formatu.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedTopics'
+
+    post:
+      tags: [Topics]
+      summary: Kreiranje nove teme
+      description: |
+        Kreira novu temu i automatski je povezuje sa prijavljenim korisnikom.
+
+        Potrebna zaglavlja:
+        - Accept: application/json
+        - Content-Type: application/json
+        - Authorization: Bearer {token}
+      operationId: createTopic
+      security:
+        - sanctum: []
+      parameters:
+        - $ref: '#/components/parameters/AcceptHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TopicInput'
+            example:
+              title: Laravel diskusija
+              body: Tema za razgovor o Laravel framework-u.
+      responses:
+        '201':
+          description: Tema je uspešno kreirana.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Topic'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /topics/filter:
+    get:
+      tags: [Topics]
+      summary: Filtriranje tema
+      description: |
+        Filtrira teme prema tekstu pretrage i/ili korisniku.
+
+        Potrebno zaglavlje:
+        - Accept: application/json
+      operationId: filterTopics
+      parameters:
+        - $ref: '#/components/parameters/AcceptHeader'
+        - in: query
+          name: search
+          description: Tekst koji se traži u naslovu teme.
+          schema:
+            type: string
+        - in: query
+          name: user_id
+          description: ID autora teme.
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Filtrirana i paginirana lista tema.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedTopics'
+
+  /topics/{topic}:
+    get:
+      tags: [Topics]
+      summary: Prikaz jedne teme
+      description: |
+        Vraća temu na osnovu njenog ID-a.
+
+        Potrebno zaglavlje:
+        - Accept: application/json
+      operationId: showTopic
+      parameters:
+        - $ref: '#/components/parameters/AcceptHeader'
+        - $ref: '#/components/parameters/TopicId'
+      responses:
+        '200':
+          description: Podaci o temi.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Topic'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: [Topics]
+      summary: Izmena teme
+      description: |
+        Menja naslov i sadržaj postojeće teme. Običan korisnik može menjati samo svoju temu, dok moderator i administrator imaju proširena prava.
+
+        Potrebna zaglavlja:
+        - Accept: application/json
+        - Content-Type: application/json
+        - Authorization: Bearer {token}
+      operationId: updateTopic
+      security:
+        - sanctum: []
+      parameters:
+        - $ref: '#/components/parameters/AcceptHeader'
+        - $ref: '#/components/parameters/TopicId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TopicInput'
+      responses:
+        '200':
+          description: Tema je uspešno izmenjena.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Topic'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+    patch:
+      tags: [Topics]
+      summary: Delimična izmena teme
+      description: Delimično menja postojeću temu.
+      operationId: patchTopic
+      security:
+        - sanctum: []
+      parameters:
+        - $ref: '#/components/parameters/AcceptHeader'
+        - $ref: '#/components/parameters/TopicId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TopicInput'
+      responses:
+        '200':
+          description: Tema je uspešno izmenjena.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [Topics]
+      summary: Brisanje teme
+      description: |
+        Briše temu. Običan korisnik može obrisati samo svoju temu, moderator i administrator mogu moderirati i tuđ sadržaj.
+
+        Potrebna zaglavlja:
+        - Accept: application/json
+        - Authorization: Bearer {token}
+      operationId: deleteTopic
+      security:
+        - sanctum: []
+      parameters:
+        - $ref: '#/components/parameters/AcceptHeader'
+        - $ref: '#/components/parameters/TopicId'
+      responses:
+        '204':
+          description: Tema je uspešno obrisana. Odgovor nema telo.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /topics/{topic}/posts:
+    get:
+      tags: [Topics, Posts]
+      summary: Prikaz postova određene teme
+      description: |
+        Ugnježdena ruta koja vraća sve postove povezane sa konkretnom temom.
+
+        Potrebno zaglavlje:
+        - Accept: application/json
+      operationId: topicPosts
+      parameters:
+        - $ref: '#/components/parameters/AcceptHeader'
+        - $ref: '#/components/parameters/TopicId'
+      responses:
+        '200':
+          description: Lista postova teme.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Post'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /posts:
+    get:
+      tags: [Posts]
+      summary: Prikaz svih postova
+      description: |
+        Vraća listu postova u JSON formatu.
+
+        Potrebno zaglavlje:
+        - Accept: application/json
+      operationId: listPosts
+      parameters:
+        - $ref: '#/components/parameters/AcceptHeader'
+      responses:
+        '200':
+          description: Lista postova.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Post'
+
+    post:
+      tags: [Posts]
+      summary: Kreiranje posta
+      description: |
+        Kreira novi post i povezuje ga sa temom i prijavljenim korisnikom.
+
+        Potrebna zaglavlja:
+        - Accept: application/json
+        - Content-Type: application/json
+        - Authorization: Bearer {token}
+      operationId: createPost
+      security:
+        - sanctum: []
+      parameters:
+        - $ref: '#/components/parameters/AcceptHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostInput'
+            example:
+              body: Ovo je moj odgovor na temu.
+              topic_id: 1
+      responses:
+        '201':
+          description: Post je uspešno kreiran.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /posts/filter:
+    get:
+      tags: [Posts]
+      summary: Filtriranje postova
+      description: Filtrira postove prema kriterijumima.
+      operationId: filterPosts
+      parameters:
+        - $ref: '#/components/parameters/AcceptHeader'
+        - in: query
+          name: topic_id
+          description: ID teme.
+          schema:
+            type: integer
+        - in: query
+          name: user_id
+          description: ID autora posta.
+          schema:
+            type: integer
+        - in: query
+          name: search
+          description: Tekst za pretragu sadržaja posta.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Filtrirana lista postova.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Post'
+
+  /posts/{post}:
+    get:
+      tags: [Posts]
+      summary: Prikaz jednog posta
+      description: Vraća post na osnovu ID-a.
+      operationId: showPost
+      parameters:
+        - $ref: '#/components/parameters/AcceptHeader'
+        - $ref: '#/components/parameters/PostId'
+      responses:
+        '200':
+          description: Podaci o postu.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: [Posts]
+      summary: Izmena posta
+      description: |
+        Menja postojeći post. Vlasnik, moderator ili administrator mogu izvršiti dozvoljenu izmenu.
+
+        Potrebna zaglavlja:
+        - Accept: application/json
+        - Content-Type: application/json
+        - Authorization: Bearer {token}
+      operationId: updatePost
+      security:
+        - sanctum: []
+      parameters:
+        - $ref: '#/components/parameters/AcceptHeader'
+        - $ref: '#/components/parameters/PostId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostInput'
+      responses:
+        '200':
+          description: Post je uspešno izmenjen.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+    patch:
+      tags: [Posts]
+      summary: Delimična izmena posta
+      operationId: patchPost
+      security:
+        - sanctum: []
+      parameters:
+        - $ref: '#/components/parameters/AcceptHeader'
+        - $ref: '#/components/parameters/PostId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostInput'
+      responses:
+        '200':
+          description: Post je izmenjen.
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    delete:
+      tags: [Posts]
+      summary: Brisanje posta
+      description: Briše post ukoliko korisnik ima odgovarajuća prava.
+      operationId: deletePost
+      security:
+        - sanctum: []
+      parameters:
+        - $ref: '#/components/parameters/AcceptHeader'
+        - $ref: '#/components/parameters/PostId'
+      responses:
+        '204':
+          description: Post je uspešno obrisan.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /posts/{post}/comments:
+    get:
+      tags: [Comments]
+      summary: Prikaz komentara određenog posta
+      description: |
+        Ugnježdena ruta koja vraća komentare povezane sa konkretnim postom.
+
+        Potrebno zaglavlje:
+        - Accept: application/json
+      operationId: postComments
+      parameters:
+        - $ref: '#/components/parameters/AcceptHeader'
+        - $ref: '#/components/parameters/PostId'
+      responses:
+        '200':
+          description: Lista komentara.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Comment'
+
+    post:
+      tags: [Comments]
+      summary: Dodavanje komentara
+      description: |
+        Kreira komentar za konkretan post.
+
+        Potrebna zaglavlja:
+        - Accept: application/json
+        - Content-Type: application/json
+        - Authorization: Bearer {token}
+      operationId: createComment
+      security:
+        - sanctum: []
+      parameters:
+        - $ref: '#/components/parameters/AcceptHeader'
+        - $ref: '#/components/parameters/PostId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommentInput'
+            example:
+              body: Ovo je komentar na post.
+      responses:
+        '201':
+          description: Komentar je uspešno kreiran.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comment'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /comments/{comment}:
+    put:
+      tags: [Comments]
+      summary: Izmena komentara
+      description: Menja postojeći komentar ukoliko korisnik ima dozvolu.
+      operationId: updateComment
+      security:
+        - sanctum: []
+      parameters:
+        - $ref: '#/components/parameters/AcceptHeader'
+        - $ref: '#/components/parameters/CommentId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommentInput'
+      responses:
+        '200':
+          description: Komentar je uspešno izmenjen.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comment'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags: [Comments]
+      summary: Delimična izmena komentara
+      operationId: patchComment
+      security:
+        - sanctum: []
+      parameters:
+        - $ref: '#/components/parameters/AcceptHeader'
+        - $ref: '#/components/parameters/CommentId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommentInput'
+      responses:
+        '200':
+          description: Komentar je izmenjen.
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    delete:
+      tags: [Comments]
+      summary: Brisanje komentara
+      description: Briše komentar ukoliko korisnik ima odgovarajuću dozvolu.
+      operationId: deleteComment
+      security:
+        - sanctum: []
+      parameters:
+        - $ref: '#/components/parameters/AcceptHeader'
+        - $ref: '#/components/parameters/CommentId'
+      responses:
+        '204':
+          description: Komentar je uspešno obrisan.
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /posts/{post}/like:
+    post:
+      tags: [Likes]
+      summary: Lajkovanje ili uklanjanje lajka
+      description: |
+        Menja stanje lajka za prijavljenog korisnika i izabrani post.
+        Ako lajk ne postoji, kreira se. Ako postoji, briše se.
+        Operacija se izvršava u DB transakciji.
+
+        Potrebna zaglavlja:
+        - Accept: application/json
+        - Authorization: Bearer {token}
+      operationId: togglePostLike
+      security:
+        - sanctum: []
+      parameters:
+        - $ref: '#/components/parameters/AcceptHeader'
+        - $ref: '#/components/parameters/PostId'
+      responses:
+        '200':
+          description: Stanje lajka je uspešno promenjeno.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LikeToggleResponse'
+              examples:
+                liked:
+                  value:
+                    id: 5
+                    post_id: 1
+                    user_id: 2
+                    liked: true
+                unliked:
+                  value:
+                    post_id: 1
+                    user_id: 2
+                    liked: false
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          description: Greška pri izvršavanju transakcije.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /statistics/topics:
+    get:
+      tags: [Statistics]
+      summary: Statistika tema
+      description: |
+        Vraća statistiku tema koristeći JOIN operacije, COUNT agregacije i GROUP BY.
+
+        Izlaz sadrži autora, broj postova, broj komentara i broj lajkova za svaku temu.
+
+        Potrebno zaglavlje:
+        - Accept: application/json
+      operationId: topicStatistics
+      parameters:
+        - $ref: '#/components/parameters/AcceptHeader'
+      responses:
+        '200':
+          description: Statistika tema.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TopicStatistics'
+              example:
+                - topic_id: 1
+                  title: Laravel diskusija
+                  author: Masa
+                  posts_count: 4
+                  comments_count: 10
+                  likes_count: 7
+
+  /external/stories:
+    get:
+      tags: [Public services]
+      summary: Prikaz Hacker News priča
+      description: |
+        Poziva Hacker News REST API, preuzima najpopularnije priče, obrađuje dobijene podatke i vraća prilagođeni JSON odgovor.
+
+        Potrebno zaglavlje:
+        - Accept: application/json
+      operationId: hackerNewsStories
+      parameters:
+        - $ref: '#/components/parameters/AcceptHeader'
+      responses:
+        '200':
+          description: Obrađena lista Hacker News priča.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HackerNewsResponse'
+              example:
+                source: Hacker News
+                stories:
+                  - title: Example story
+                    url: https://example.com
+                    score: 250
+                    comments: 85
+        '502':
+          description: Eksterni Hacker News servis nije dostupan.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /public/news:
+    get:
+      tags: [Public services]
+      summary: Prikaz aktuelnih vesti
+      description: |
+        Poziva NewsAPI servis i vraća članke za izabranu državu i kategoriju.
+
+        Potrebno zaglavlje:
+        - Accept: application/json
+      operationId: publicNews
+      parameters:
+        - $ref: '#/components/parameters/AcceptHeader'
+        - in: query
+          name: country
+          description: Oznaka države.
+          schema:
+            type: string
+            default: us
+          example: us
+        - in: query
+          name: category
+          description: Kategorija vesti.
+          schema:
+            type: string
+            default: technology
+          example: technology
+      responses:
+        '200':
+          description: Lista članaka.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NewsResponse'
+        '500':
+          description: NEWS_API_KEY nije konfigurisan.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: NewsAPI servis nije dostupan.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /public/weather:
+    get:
+      tags: [Public services]
+      summary: Prikaz vremenskih podataka
+      description: |
+        Poziva OpenWeatherMap API za izabrani grad i vraća obrađene vremenske podatke.
+
+        Potrebno zaglavlje:
+        - Accept: application/json
+      operationId: publicWeather
+      parameters:
+        - $ref: '#/components/parameters/AcceptHeader'
+        - in: query
+          name: city
+          description: Naziv grada.
+          schema:
+            type: string
+            default: Belgrade
+          example: Belgrade
+      responses:
+        '200':
+          description: Obrađeni vremenski podaci.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WeatherResponse'
+              example:
+                source: OpenWeatherMap
+                city: Belgrade
+                temperature_c: 24.6
+                description: clear sky
+                humidity: 48
+        '500':
+          description: OPENWEATHER_API_KEY nije konfigurisan.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: OpenWeatherMap servis nije dostupan.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /admin/topics/export:
+    get:
+      tags: [Admin]
+      summary: Eksport tema
+      description: |
+        Eksportuje podatke o temama. Ruta je namenjena administratorskoj ulozi.
+
+        Potrebna zaglavlja:
+        - Accept: application/json
+        - Authorization: Bearer {token}
+      operationId: exportTopics
+      security:
+        - sanctum: []
+      parameters:
+        - $ref: '#/components/parameters/AcceptHeader'
+      responses:
+        '200':
+          description: Podaci za eksport tema.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /admin/posts/export:
+    get:
+      tags: [Admin]
+      summary: Eksport postova
+      description: |
+        Eksportuje podatke o postovima. Ruta je namenjena administratorskoj ulozi.
+
+        Potrebna zaglavlja:
+        - Accept: application/json
+        - Authorization: Bearer {token}
+      operationId: exportPosts
+      security:
+        - sanctum: []
+      parameters:
+        - $ref: '#/components/parameters/AcceptHeader'
+      responses:
+        '200':
+          description: Podaci za eksport postova.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+components:
+
+  securitySchemes:
+    sanctum:
+      type: http
+      scheme: bearer
+      bearerFormat: Token
+      description: Sanctum token dobijen nakon login ili register zahteva.
+
+  parameters:
+    AcceptHeader:
+      in: header
+      name: Accept
+      required: true
+      description: Format odgovora koji klijent očekuje.
+      schema:
+        type: string
+        default: application/json
+        enum: [application/json]
+
+    TopicId:
+      in: path
+      name: topic
+      required: true
+      description: Jedinstveni ID teme.
+      schema:
+        type: integer
+        example: 1
+
+    PostId:
+      in: path
+      name: post
+      required: true
+      description: Jedinstveni ID posta.
+      schema:
+        type: integer
+        example: 1
+
+    CommentId:
+      in: path
+      name: comment
+      required: true
+      description: Jedinstveni ID komentara.
+      schema:
+        type: integer
+        example: 1
+
+  schemas:
+
+    RegisterRequest:
+      type: object
+      required: [name, email, password, password_confirmation]
+      properties:
+        name:
+          type: string
+          example: Masa
+        email:
+          type: string
+          format: email
+          example: masa@example.com
+        password:
+          type: string
+          format: password
+          minLength: 8
+          example: password123
+        password_confirmation:
+          type: string
+          format: password
+          example: password123
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          example: masa@example.com
+        password:
+          type: string
+          format: password
+          example: password123
+
+    ResetPasswordRequest:
+      type: object
+      required: [email, token, password, password_confirmation]
+      properties:
+        email:
+          type: string
+          format: email
+          example: masa@example.com
+        token:
+          type: string
+          example: reset-token-example
+        password:
+          type: string
+          format: password
+          minLength: 8
+          example: newpassword123
+        password_confirmation:
+          type: string
+          format: password
+          example: newpassword123
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: Masa
+        email:
+          type: string
+          format: email
+          example: masa@example.com
+        role:
+          type: string
+          enum: [user, moderator, admin]
+          example: user
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    AuthResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        user:
+          $ref: '#/components/schemas/User'
+        token:
+          type: string
+
+    TopicInput:
+      type: object
+      required: [title, body]
+      properties:
+        title:
+          type: string
+          maxLength: 150
+          example: Laravel diskusija
+        body:
+          type: string
+          example: Tema za razgovor o Laravel framework-u.
+
+    Topic:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        title:
+          type: string
+          example: Laravel diskusija
+        body:
+          type: string
+          example: Tema za razgovor o Laravel framework-u.
+        user_id:
+          type: integer
+          example: 1
+        user:
+          $ref: '#/components/schemas/User'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    PostInput:
+      type: object
+      required: [body, topic_id]
+      properties:
+        body:
+          type: string
+          example: Ovo je moj odgovor na temu.
+        topic_id:
+          type: integer
+          example: 1
+
+    Post:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        body:
+          type: string
+          example: Ovo je moj odgovor na temu.
+        topic_id:
+          type: integer
+          example: 1
+        user_id:
+          type: integer
+          example: 2
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CommentInput:
+      type: object
+      required: [body]
+      properties:
+        body:
+          type: string
+          example: Ovo je komentar na post.
+
+    Comment:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        body:
+          type: string
+          example: Ovo je komentar na post.
+        post_id:
+          type: integer
+          example: 1
+        user_id:
+          type: integer
+          example: 2
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    LikeToggleResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          nullable: true
+          example: 5
+        post_id:
+          type: integer
+          example: 1
+        user_id:
+          type: integer
+          example: 2
+        liked:
+          type: boolean
+          example: true
+
+    TopicStatistics:
+      type: object
+      properties:
+        topic_id:
+          type: integer
+          example: 1
+        title:
+          type: string
+          example: Laravel diskusija
+        author:
+          type: string
+          example: Masa
+        posts_count:
+          type: integer
+          example: 4
+        comments_count:
+          type: integer
+          example: 10
+        likes_count:
+          type: integer
+          example: 7
+
+    HackerNewsStory:
+      type: object
+      properties:
+        title:
+          type: string
+        url:
+          type: string
+          format: uri
+        score:
+          type: integer
+        comments:
+          type: integer
+
+    HackerNewsResponse:
+      type: object
+      properties:
+        source:
+          type: string
+          example: Hacker News
+        stories:
+          type: array
+          items:
+            $ref: '#/components/schemas/HackerNewsStory'
+
+    NewsResponse:
+      type: object
+      properties:
+        source:
+          type: string
+          example: NewsAPI
+        items:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+
+    WeatherResponse:
+      type: object
+      properties:
+        source:
+          type: string
+          example: OpenWeatherMap
+        city:
+          type: string
+          example: Belgrade
+        temperature_c:
+          type: number
+          format: float
+          nullable: true
+          example: 24.6
+        description:
+          type: string
+          nullable: true
+          example: clear sky
+        humidity:
+          type: integer
+          nullable: true
+          example: 48
+
+    PaginatedTopics:
+      type: object
+      properties:
+        current_page:
+          type: integer
+          example: 1
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Topic'
+        first_page_url:
+          type: string
+          nullable: true
+        from:
+          type: integer
+          nullable: true
+        last_page:
+          type: integer
+          example: 2
+        last_page_url:
+          type: string
+          nullable: true
+        next_page_url:
+          type: string
+          nullable: true
+        path:
+          type: string
+        per_page:
+          type: integer
+          example: 15
+        prev_page_url:
+          type: string
+          nullable: true
+        to:
+          type: integer
+          nullable: true
+        total:
+          type: integer
+          example: 18
+
+    ExportResponse:
+      type: object
+      description: Podaci pripremljeni za eksport.
+      additionalProperties: true
+
+    MessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Operacija je uspešno izvršena.
+
+    ErrorResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Došlo je do greške.
+        error:
+          type: string
+          nullable: true
+
+    ValidationError:
+      type: object
+      properties:
+        message:
+          type: string
+          example: The given data was invalid.
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+
+  responses:
+
+    Unauthorized:
+      description: Korisnik nije autentifikovan ili kredencijali nisu ispravni.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            message: Unauthenticated.
+
+    Forbidden:
+      description: Korisnik nema dozvolu za izvršavanje ove operacije.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            message: Nemate dozvolu za ovu akciju.
+
+    NotFound:
+      description: Traženi resurs nije pronađen.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            message: Resource not found.
+
+    ValidationError:
+      description: Prosleđeni podaci nisu validni.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationError'
+          example:
+            message: The given data was invalid.
+            errors:
+              title:
+                - The title field is required.
