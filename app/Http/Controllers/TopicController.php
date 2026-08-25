@@ -9,11 +9,29 @@ use Illuminate\Http\Request;
 class TopicController extends Controller
 {
 
-public function posts(Topic $topic): JsonResponse
+public function posts(Request $request, Topic $topic): JsonResponse
 {
-    return response()->json(
-        $topic->posts()->with('user')->latest()->get()
-    );
+    $user = $request->user('sanctum');
+
+    $posts = $topic->posts()
+        ->with('user')
+        ->withCount('likes')
+        ->latest()
+        ->get();
+
+    if ($user) {
+        $likedPostIds = $user->likes()
+            ->whereIn('post_id', $posts->pluck('id'))
+            ->pluck('post_id');
+
+        $posts->each(function ($post) use ($likedPostIds) {
+            $post->setAttribute('liked_by_user', $likedPostIds->contains($post->id));
+        });
+    } else {
+        $posts->each->setAttribute('liked_by_user', false);
+    }
+
+    return response()->json($posts);
 }
  public function index(Request $request): JsonResponse
 {
