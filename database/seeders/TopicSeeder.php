@@ -2,26 +2,18 @@
 
 namespace Database\Seeders;
 
-use App\Models\Category;
 use App\Models\Topic;
 use App\Models\User;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
 class TopicSeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     *
-     * @return void
-     */
-    public function run()
+    public function run(): void
     {
         $userIds = User::pluck('id');
 
-        Category::all()->each(function (Category $category) use ($userIds) {
-            Topic::factory(3)->create([
-                'category_id' => $category->id,
+        Topic::factory(10)->create()->each(function ($topic) use ($userIds) {
+            $topic->update([
                 'user_id' => $userIds->random(),
             ]);
         });

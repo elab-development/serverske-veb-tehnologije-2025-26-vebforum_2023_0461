@@ -19,7 +19,6 @@ class TopicFactory extends Factory
     return [
         'title' => fake()->sentence(4),
         'body' => fake()->paragraph(),
-        'category_id' => \App\Models\Category::factory(),
         'user_id' => \App\Models\User::factory(),
     ];
 }

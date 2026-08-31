@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Models\Category;
 use App\Models\Comment;
 use App\Models\Post;
 use App\Models\Topic;
@@ -31,7 +30,6 @@ class CommentLikeTest extends TestCase
             'user_id' => $author->id,
             'topic_id' => Topic::factory()->create([
                 'user_id' => $author->id,
-                'category_id' => Category::factory()->create()->id,
             ])->id,
         ]);
 
@@ -66,7 +64,7 @@ class CommentLikeTest extends TestCase
             'user_id' => $author->id,
             'topic_id' => Topic::factory()->create([
                 'user_id' => $author->id,
-                'category_id' => Category::factory()->create()->id,
+               
             ])->id,
         ]);
         $comment = Comment::factory()->create([
